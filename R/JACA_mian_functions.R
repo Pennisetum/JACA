@@ -6,7 +6,7 @@
 #' that is to use information from both labeled and unlabeled subjects to construct classification rules.
 #'
 #' @param Z An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.
-#' @param X_list A list of input data matrix; in each sublist, rows are samples and columns are features.
+#' @param X_list A list of input data matrices; in each sublist, rows are samples and columns are features.
 #' @param lambda A vector of L1 penalty parameters; if there are D input data matrices, lambda should also contain D elements. \code{lambda} controls the sparsity of the solutions and must be between 0 and 1 (small L1 bound corresponds to less penalization).
 #' @param rho  Scaler, l2 regularization penulty parameter on X'X/n. Should also  be between 0 and 1 (small L2 bound corresponds to less penalization).
 #' @param missing Logical. If False, input data \code{X_list} must be complete and have no missing values.
@@ -21,25 +21,32 @@
 #'
 #' @examples
 #' set.seed(1)
-#' # generate class indicator matrix Z
+#' # Generate class indicator matrix Z
 #' n = 100
 #' Z=matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 #' for(i in 1:n){
-#'  Z[i, ] = sample(Z[i, ])
+#'   Z[i, ] = sample(Z[i, ])
 #' }
 #'
-#' # generate input data
+#' # Generate input data X_list
 #' d = 2
 #' X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 #'
-#' # train the model
-#' jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
+#' # Train JACA model
+#' W = jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
 #'
-#' # test semi supervised learning
+#' # Show the number of non-zero rows of each matrix of discriminant vectors
+#' sapply(W, function(x) sum(rowSums(x) != 0))
+#'
+#' # Test semi supervised learning
+#' # Set certain class labels and subsets of views as missing
 #' Z[90:100, ] = rep(NA, 3)
 #' X_list[[1]][1:10, ] = NA
 #' X_list[[2]][11:20, ] = NA
-#' jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),alpha = 0.5, rho = 0.2, missing = TRUE)
+#' W = jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),alpha = 0.5, rho = 0.2, missing = TRUE)
+#'
+#' # Show the number of non-zero rows of each matrix of discriminant vectors
+#' sapply(W, function(x) sum(rowSums(x) != 0))
 #'
 #' @export
 jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = NULL, kmax = 500, eps = 1e-06,
@@ -136,7 +143,7 @@ jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = 
 #' Chooses optimal tuning parameters lambda and rho for function \code{jacaTrain} using cross-validation.
 #'
 #' @param Z An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.
-#' @param X_list A list of input data matrix; in each sublist, rows are samples and columns are features.
+#' @param X_list A list of input data matrices; in each sublist, rows are samples and columns are features.
 #' @param nfolds Number of cross-validation folds.
 #' @param lambda_seq The set of L1 penalty parameters to be considered. Should be chosen from 0 to 1.
 #' The default value is NULL and \code{jacaCV} generates its own sequence.
@@ -161,27 +168,31 @@ jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = 
 #'
 #' @examples
 #' set.seed(1)
-#' # generate class indicator matrix Z
+#' # Generate class indicator matrix Z
 #' n = 500
 #' Z = matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 #' for(i in 1:n){
 #'   Z[i, ] = sample(Z[i, ])
 #' }
 #'
-#' # generate input data
+#' # Generate input data X_list
 #' d = 2
 #' X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 #' id <- 1:nrow(Z)
 #'
+#' # Train JACA model using cross validation
 #' result = jacaCV(Z, X_list, nfolds = 3, lambda_seq = c(0.02, 0.04), rho_seq = c(0.3, 0.6))$W_min
 #'
-#' # test semi supervised learning
+#' # Test semi supervised learning
+#' # Set certain class labels and subsets of views as missing
 #' Z[90:100, ] = rep(NA, 3)
 #' X_list[[1]][1:10, ] = NA
 #' X_list[[2]][11:20, ] = NA
+#'
+#' # Train JACA model using cross validation
 #' result = jacaCV(Z, X_list, nfolds = 3, lambda_seq = c(0.02, 0.04),
 #'                 rho_seq = c(0.3, 0.6), missing = TRUE)$W_min
-
+#'
 #' @export
 
 jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_seq = seq(0.01, 1, length = 20),
@@ -315,37 +326,37 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
 #' by \code{W_list}, \code{testx}.
 #'
 #' @param W_list A list of view-specific matrices of discriminant vectors. Should be the results of \code{jacaTrain} or \code{jacaCV}.
-#' @param trainx A list of input features that are used to generate the model: in each sublist, samples are rows and columns are features.
+#' @param trainx A list of input data matrices that are used to generate the model: in each sublist, samples are rows and columns are features.
 #' @param trainz An N by K class indicator matrix that are used to generate the model; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.
-#' @param testx A list of input features. Predictions will be made using it.
+#' @param testx A list of input data matrices Predictions will be made using it.
 #'
 #' @return \item{prediction}{An n by D matrix with predicted group labels for the test set. Columns are predictions made by each dataset seperately.}
 #'
 #' @examples
 #' set.seed(1)
-#' # generate class indicator matrix Z
+#' # Generate class indicator matrix Z
 #' n = 100
 #' Z=matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 #' for(i in 1:n){
-#'  Z[i, ] = sample(Z[i, ])
+#'   Z[i, ] = sample(Z[i, ])
 #' }
 #'
-#' # generate input data
+#' # Generate input data X_list
 #' d = 2
 #' X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 #'
-#' # train the model
+#' # Train the model
 #' result = jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
 #'
-#' # make predictions by each dataset seperately
+#' # Make predictions by each dataset seperately
 #' zTest = predictJACA(result, X_list, Z, X_list)
 #'
-#' # make predictions by the concatenated dataset
-#' wConca = list()
-#' wConca[[1]] = do.call(rbind, result)
+#' # Make predictions by the concatenated dataset
+#' wJoint = list()
+#' wJoint[[1]] = do.call(rbind, result)
 #' xTrain = list()
 #' xTrain[[1]] = do.call(cbind, X_list)
-#' zTestConcatenated = predictJACA(wConca, xTrain, Z, xTrain)
+#' zTestConcatenated = predictJACA(wJoint, xTrain, Z, xTrain)
 #'
 #' @export
 predictJACA = function(W_list, trainx, trainz, testx) {
