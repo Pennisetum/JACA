@@ -1,5 +1,5 @@
 # JACA: Joint association and classification analysis of multi-view data
-The R package 'JACA' implements a joint statistical framework that  performs association and classification analysis for multi-view data, where Multi-view data refers to matched sets of measurements on the same subjects. The corresponding reference is
+The R package 'JACA' implements a joint statistical framework that  performs association and classification analysis for multi-view data, where multi-view data refers to matched sets of measurements on the same subjects. The corresponding reference is
 
 ["Joint association and classification analysis of multi-view data" by Zhang and Gaynanova](https://arxiv.org/abs/1811.08511) (2018+).
 
