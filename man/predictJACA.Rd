@@ -9,11 +9,11 @@ predictJACA(W_list, trainx, trainz, testx)
 \arguments{
 \item{W_list}{A list of view-specific matrices of discriminant vectors. Should be the results of \code{jacaTrain} or \code{jacaCV}.}
 
-\item{trainx}{A list of input features that are used to generate the model: in each sublist, samples are rows and columns are features.}
+\item{trainx}{A list of input data matrices that are used to generate the model: in each sublist, samples are rows and columns are features.}
 
 \item{trainz}{An N by K class indicator matrix that are used to generate the model; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}
 
-\item{testx}{A list of input features. Predictions will be made using it.}
+\item{testx}{A list of input data matrices Predictions will be made using it.}
 }
 \value{
 \item{prediction}{An n by D matrix with predicted group labels for the test set. Columns are predictions made by each dataset seperately.}
@@ -25,28 +25,28 @@ by \code{W_list}, \code{testx}.
 }
 \examples{
 set.seed(1)
-# generate class indicator matrix Z
+# Generate class indicator matrix Z
 n = 100
 Z=matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 for(i in 1:n){
- Z[i, ] = sample(Z[i, ])
+  Z[i, ] = sample(Z[i, ])
 }
 
-# generate input data
+# Generate input data X_list
 d = 2
 X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 
-# train the model
+# Train the model
 result = jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
 
-# make predictions by each dataset seperately
+# Make predictions by each dataset seperately
 zTest = predictJACA(result, X_list, Z, X_list)
 
-# make predictions by the concatenated dataset
-wConca = list()
-wConca[[1]] = do.call(rbind, result)
+# Make predictions by the concatenated dataset
+wJoint = list()
+wJoint[[1]] = do.call(rbind, result)
 xTrain = list()
 xTrain[[1]] = do.call(cbind, X_list)
-zTestConcatenated = predictJACA(wConca, xTrain, Z, xTrain)
+zTestConcatenated = predictJACA(wJoint, xTrain, Z, xTrain)
 
 }

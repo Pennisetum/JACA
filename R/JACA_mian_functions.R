@@ -43,7 +43,8 @@
 #' Z[90:100, ] = rep(NA, 3)
 #' X_list[[1]][1:10, ] = NA
 #' X_list[[2]][11:20, ] = NA
-#' W = jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),alpha = 0.5, rho = 0.2, missing = TRUE)
+#' W = jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),
+#'               alpha = 0.5, rho = 0.2, missing = TRUE)
 #'
 #' # Show the number of non-zero rows of each matrix of discriminant vectors
 #' sapply(W, function(x) sum(rowSums(x) != 0))

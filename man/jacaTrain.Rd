@@ -10,7 +10,7 @@ jacaTrain(Z, X_list, lambda, rho, missing = F, alpha = 0.5,
 \arguments{
 \item{Z}{An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}
 
-\item{X_list}{A list of input data matrix; in each sublist, rows are samples and columns are features.}
+\item{X_list}{A list of input data matrices; in each sublist, rows are samples and columns are features.}
 
 \item{lambda}{A vector of L1 penalty parameters; if there are D input data matrices, lambda should also contain D elements. \code{lambda} controls the sparsity of the solutions and must be between 0 and 1 (small L1 bound corresponds to less penalization).}
 
@@ -40,24 +40,32 @@ that is to use information from both labeled and unlabeled subjects to construct
 }
 \examples{
 set.seed(1)
-# generate class indicator matrix Z
+# Generate class indicator matrix Z
 n = 100
 Z=matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 for(i in 1:n){
- Z[i, ] = sample(Z[i, ])
+  Z[i, ] = sample(Z[i, ])
 }
 
-# generate input data
+# Generate input data X_list
 d = 2
 X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 
-# train the model
-jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
+# Train JACA model
+W = jacaTrain(Z, X_list, lambda = rep(0.05, 2), verbose = FALSE, alpha= 0.5, rho = 0.2)
 
-# test semi supervised learning
+# Show the number of non-zero rows of each matrix of discriminant vectors
+sapply(W, function(x) sum(rowSums(x) != 0))
+
+# Test semi supervised learning
+# Set certain class labels and subsets of views as missing
 Z[90:100, ] = rep(NA, 3)
 X_list[[1]][1:10, ] = NA
 X_list[[2]][11:20, ] = NA
-jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),alpha = 0.5, rho = 0.2, missing = TRUE)
+W = jacaTrain(Z, X_list, kmax = 200, eps = 1e-06, lambda = rep(0.05, 2),
+              alpha = 0.5, rho = 0.2, missing = TRUE)
+
+# Show the number of non-zero rows of each matrix of discriminant vectors
+sapply(W, function(x) sum(rowSums(x) != 0))
 
 }

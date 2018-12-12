@@ -12,7 +12,7 @@ jacaCV(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50,
 \arguments{
 \item{Z}{An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}
 
-\item{X_list}{A list of input data matrix; in each sublist, rows are samples and columns are features.}
+\item{X_list}{A list of input data matrices; in each sublist, rows are samples and columns are features.}
 
 \item{nfolds}{Number of cross-validation folds.}
 
@@ -58,24 +58,29 @@ Chooses optimal tuning parameters lambda and rho for function \code{jacaTrain} u
 }
 \examples{
 set.seed(1)
-# generate class indicator matrix Z
+# Generate class indicator matrix Z
 n = 500
 Z = matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
 for(i in 1:n){
   Z[i, ] = sample(Z[i, ])
 }
 
-# generate input data
+# Generate input data X_list
 d = 2
 X_list = sapply(1:d, function(i) list(matrix(rnorm(n * 20), n, 20)))
 id <- 1:nrow(Z)
 
+# Train JACA model using cross validation
 result = jacaCV(Z, X_list, nfolds = 3, lambda_seq = c(0.02, 0.04), rho_seq = c(0.3, 0.6))$W_min
 
-# test semi supervised learning
+# Test semi supervised learning
+# Set certain class labels and subsets of views as missing
 Z[90:100, ] = rep(NA, 3)
 X_list[[1]][1:10, ] = NA
 X_list[[2]][11:20, ] = NA
+
+# Train JACA model using cross validation
 result = jacaCV(Z, X_list, nfolds = 3, lambda_seq = c(0.02, 0.04),
                 rho_seq = c(0.3, 0.6), missing = TRUE)$W_min
+
 }
