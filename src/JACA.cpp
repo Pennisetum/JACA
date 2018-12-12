@@ -113,7 +113,7 @@ mat blockCoorDescent(const mat& Ytilder, const mat& Xtilder, vec lambda, double 
 
     // stop the function if exceed the max num of loops
     if (k>kmax){
-      Rcout<<"Inner loop fails to converge"<<endl;
+      Rcout<<"Inner loop fails to converge, please increase kmax."<<endl;
       break;
     }
   }
