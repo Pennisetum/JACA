@@ -9,7 +9,7 @@ Description: This package implements Joint association and classification analys
     Multi-view data refers to matched sets of measurements on the same subjects, and JACA is a joint statistical framework that performs association and classification analysis simultaneously. This package contains functions to fit the model, tune parameters and classify observations using the supplied model.
 License: GPL (>= 2)
 Encoding: UTF-8
-LazyData: true
+LazyData: TRUE
 Imports: Rcpp (>= 0.12.9), Matrix, stats, utils, MASS
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 6.1.1
