@@ -4,10 +4,22 @@
 \alias{jacaCV}
 \title{Cross-validation function for JACA}
 \usage{
-jacaCV(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50,
-  rho_seq = seq(0.01, 1, length = 20), n_rho = 5, missing = F,
-  alpha = 0.5, W_list = NULL, kmax = 500, eps = 1e-06,
-  verbose = F, foldID = NULL)
+jacaCV(
+  Z,
+  X_list,
+  nfolds = 5,
+  lambda_seq = NULL,
+  n_lambda = 50,
+  rho_seq = seq(0.01, 1, length = 20),
+  n_rho = 5,
+  missing = F,
+  alpha = 0.5,
+  W_list = NULL,
+  kmax = 500,
+  eps = 1e-06,
+  verbose = F,
+  foldID = NULL
+)
 }
 \arguments{
 \item{Z}{An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}

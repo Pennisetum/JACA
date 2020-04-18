@@ -4,8 +4,18 @@
 \alias{jacaTrain}
 \title{Solve Joint Association and Classification Analysis problem for multi-view data.}
 \usage{
-jacaTrain(Z, X_list, lambda, rho, missing = F, alpha = 0.5,
-  W_list = NULL, kmax = 500, eps = 1e-06, verbose = F)
+jacaTrain(
+  Z,
+  X_list,
+  lambda,
+  rho,
+  missing = F,
+  alpha = 0.5,
+  W_list = NULL,
+  kmax = 500,
+  eps = 1e-06,
+  verbose = F
+)
 }
 \arguments{
 \item{Z}{An N by K class indicator matrix; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}

@@ -4,7 +4,7 @@
 \alias{predictJACA}
 \title{Classification method for JACA model}
 \usage{
-predictJACA(W_list, trainx, trainz, testx)
+predictJACA(W_list, trainx, trainz, testx, posterior = F)
 }
 \arguments{
 \item{W_list}{A list of view-specific matrices of discriminant vectors. Should be the results of \code{jacaTrain} or \code{jacaCV}.}
@@ -14,9 +14,11 @@ predictJACA(W_list, trainx, trainz, testx)
 \item{trainz}{An N by K class indicator matrix that are used to generate the model; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.}
 
 \item{testx}{A list of input data matrices Predictions will be made using it.}
+
+\item{posterior}{Logical. If True, the function output the posterior probabilities for the classes, otherwise it will output the class assignments results.}
 }
 \value{
-\item{prediction}{An n by D matrix with predicted group labels for the test set. Columns are predictions made by each dataset seperately.}
+\item{prediction}{An n by D matrix with predicted group labels/posterior probabilities for the test set. Columns are predictions made by each dataset seperately.}
 }
 \description{
 Classify observations in the test set based on the supplied matrices of canonical vectors \code{W_list} and the training datasets.
