@@ -379,7 +379,7 @@ predictJACA = function(W_list, trainx, trainz, testx, posterior = F) {
       temp = (centeredX[[i]] %*% W_list[[i]])[, nonzero_col, drop = F]
       colnames(temp) <- paste("X", 1:(ncol(pred.data) - 1), sep = "")
       if(posterior)
-        Y.pred[[i]] = as.numeric(as.character(predict(lda.model, data.frame(temp))$posterior))
+        Y.pred[[i]] = predict(lda.model, data.frame(temp))$posterior)
       else
         Y.pred[[i]] = as.numeric(as.character(predict(lda.model, data.frame(temp))$class))
     } else {
