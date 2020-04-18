@@ -1,8 +1,8 @@
 Package: JACA
 Type: Package
 Title: Joint Association and Classification Analysis
-Version: 1.0.0
-Date: 2019-02-18
+Version: 1.0.1
+Date: 2020-04-18
 Author: Yunfeng Zhang and Irina Gaynanova
 Maintainer: Yunfeng Zhang <yfzhang@stat.tamu.edu>
 Description: This package implements Joint association and classification analysis of multi-view data <arXiv:1811.08511 [stat.ML]>. 
