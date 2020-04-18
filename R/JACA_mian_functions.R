@@ -330,9 +330,9 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
 #' @param trainx A list of input data matrices that are used to generate the model: in each sublist, samples are rows and columns are features.
 #' @param trainz An N by K class indicator matrix that are used to generate the model; rows are samples and columns are class indicator vectors with z_k = 1 if observation belongs to class k.
 #' @param testx A list of input data matrices Predictions will be made using it.
-#' @param posterior Logical. If True, the function outputs the posterior probabilities for the classes, otherwise it will outputs the class assignments results.
+#' @param posterior Logical. If TRUE, the function outputs the posterior probabilities for the classes, otherwise it will outputs the class assignments results.
 #'
-#' @return \item{prediction}{An n by D matrix with predicted group labels/posterior probabilities for the test set. Columns are predictions made by each dataset seperately.}
+#' @return \item{prediction}{An n by D matrix with predicted group labels for the test set if posterior = FALSE. Columns are predictions made by each dataset seperately. Otherwise it is a list of posterior probabilities for the test set.}
 #'
 #' @examples
 #' set.seed(1)
@@ -384,10 +384,11 @@ predictJACA = function(W_list, trainx, trainz, testx, posterior = F) {
         Y.pred[[i]] = as.numeric(as.character(predict(lda.model, data.frame(temp))$class))
     } else {
       Y.pred[[i]] = sample(0:max(Y.train), nrow(testx[[1]]), replace = T)
+      Y.pred = do.call(cbind, Y.pred)
       warning("Constant canonical vectors!")
     }
   }
 
-  Y.pred = do.call(cbind, Y.pred)
+
   return(prediction = Y.pred)
 }

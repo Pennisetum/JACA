@@ -15,10 +15,10 @@ predictJACA(W_list, trainx, trainz, testx, posterior = F)
 
 \item{testx}{A list of input data matrices Predictions will be made using it.}
 
-\item{posterior}{Logical. If True, the function output the posterior probabilities for the classes, otherwise it will output the class assignments results.}
+\item{posterior}{Logical. If TRUE, the function outputs the posterior probabilities for the classes, otherwise it will outputs the class assignments results.}
 }
 \value{
-\item{prediction}{An n by D matrix with predicted group labels/posterior probabilities for the test set. Columns are predictions made by each dataset seperately.}
+\item{prediction}{An n by D matrix with predicted group labels for the test set if posterior = FALSE. Columns are predictions made by each dataset seperately. Otherwise it is a list of posterior probabilities for the test set.}
 }
 \description{
 Classify observations in the test set based on the supplied matrices of canonical vectors \code{W_list} and the training datasets.
