@@ -66,7 +66,7 @@ xprimeMissing <- function(centeredX, inter_ID_YX, inter_ID_XX, alpha) {
 
     lowerX = do.call(rbind, lowerX_temp) * sqrt(1 - alpha)
     Xprime = as.matrix(rbind(diagX, lowerX))
-
+    Xprime[is.na(Xprime)] <- 0
     return(Xprime)
   }
 }
