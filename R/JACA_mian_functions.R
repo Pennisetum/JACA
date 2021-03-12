@@ -243,9 +243,9 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     if (length(lambda_seq) == 0) {
       warning("Check input lambda_seq")
       # generate lambda_seq
-      lambda_seq <- exp(seq(log(1), log(1e-05), length.out = n_lambda))
+      lambda_seq <- exp(seq(log(1), log(1e-02), length.out = n_lambda))
     }
-  } else lambda_seq <- exp(seq(log(1), log(1e-05), length.out = n_lambda))
+  } else lambda_seq <- exp(seq(log(1), log(1e-02), length.out = n_lambda))
   n_lambda = length(lambda_seq)
 
   # If rho is supplied, the function should only keep values that satisfy 0<=rho<=1
