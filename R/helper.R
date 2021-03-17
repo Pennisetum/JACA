@@ -28,7 +28,9 @@ xPrime <- function(centeredX, alpha) {
     }
 
     lowerX = do.call(rbind, lowerX_temp)/sqrt(n * D * (D - 1)) * sqrt(1 - alpha)
-    xPrime = as.matrix(rbind(diagX, lowerX))
+    xPrime = matrix(0, ncol = ncol(lowerX), nrow = nrow(lowerX) + nrow(diagX))
+    xPrime[1:nrow(diagX), ] = as.matrix(diagX)
+    xPrime[-(1:nrow(diagX)), ] = lowerX
     return(xPrime)
   }
 }
@@ -65,7 +67,10 @@ xprimeMissing <- function(centeredX, inter_ID_YX, inter_ID_XX, alpha) {
     }
 
     lowerX = do.call(rbind, lowerX_temp) * sqrt(1 - alpha)
-    Xprime = as.matrix(rbind(diagX, lowerX))
+    # Xprime = as.matrix(rbind(diagX, lowerX))
+    Xprime = matrix(0, ncol = ncol(lowerX), nrow = nrow(lowerX) + nrow(diagX))
+    Xprime[1:nrow(diagX), ] = as.matrix(diagX)
+    Xprime[-(1:nrow(diagX)), ] = lowerX
     Xprime[is.na(Xprime)] <- 0
     return(Xprime)
   }
@@ -239,3 +244,34 @@ objectiveJACAMissing = function(W_list, test_z, train_x, test_x, D, theta, dis, 
   }
 }
 
+jacaTrain_augmented = function(bigy, bigx, coef, D, p_n, lambda, rho, missing = F, alpha = 0.5, W_list = NULL, kmax = 500, eps = 1e-06,
+                          verbose = F) {
+  # check the number of lambda provided. lambda should be a non-negtive vector
+  if (any(lambda < -eps))
+    stop("lambda must be nonnegtive!")
+  if (length(lambda) != D)
+    stop("Check the number of lambda!")
+
+
+  if (!is.null(W_list)) {
+    W_list[[1]] = do.call(rbind, W_list)
+  }
+
+  lambda_vec = rep(lambda, p_n)
+
+  if (nrow(bigx) != nrow(bigy))
+    stop("Dimensions of X_list and Z don't match!")
+
+  # fit model
+  result = jacaCpp(Y = bigy, X_list = bigx, lambda = lambda_vec, rho = rho, W_list = W_list, kmax = kmax,
+                   eps = eps, verbose = verbose)
+  order_idx = c(0, cumsum(p_n))
+  W_d = lapply(1:D, function(idx) diag(1/coef[[idx]], length(coef[[idx]])) %*% result[(order_idx[idx] +
+                                                                                         1):(order_idx[idx + 1]), , drop = F])
+
+  for (i in 1:D) {
+    W_d[[i]][abs(W_d[[i]]) < eps] = 0
+  }
+
+  return(W_d)
+}
