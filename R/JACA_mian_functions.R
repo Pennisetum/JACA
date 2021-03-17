@@ -205,6 +205,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     stop("Check your X!")
   }
 
+  # compute maximum lambda allowed
   if (missing) {
     # Record the missing ID
     Z_nonNA_id = which(apply(Z, 1, function(x) sum(is.na(x)) == 0))
@@ -216,8 +217,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
 
 
     # Compute maximum lambda
-    lambda_t = lambda_max(Z = Z, X_list = X_list, D = D, Z_nonNA_id = Z_nonNA_id, X_nonNA_id = X_nonNA_id) *
-      alpha
+    lambda_t = lambda_max(Z = Z, X_list = X_list, D = D, Z_nonNA_id = Z_nonNA_id, X_nonNA_id = X_nonNA_id) * alpha
   } else {
     if (any(anyNA(Z), sapply(X_list, anyNA))) {
       stop("Datasets contain missing value! Please set missing = T")
@@ -280,7 +280,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
   init_grid = expand.grid(lambda_seq, rho_seq)
   cv = matrix(0, nfolds, nrow(init_grid))
 
-
+  fit_model_old = W_list
   # cross validation part
   for (i in 1:nfolds) {
     ## during each iteration, select one as test, the rest (K-1) as train
@@ -290,13 +290,55 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     train_x = lapply(X_list, function(X) X[-test_idx, ])
     train_z = Z[-test_idx, ]
 
-    cv[i, ] = sapply(1:nrow(init_grid), function(cv_ind) {
-      fit_model = jacaTrain(Z = train_z, X_list = train_x, lambda = init_grid[cv_ind, 1] * lambda_t,
-                             rho = init_grid[cv_ind, 2], missing = missing, alpha = alpha, eps = eps, W_list = W_list,
-                             kmax = kmax, verbose = verbose)
-      objectiveJACA(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D,
-                    theta = transformY(train_z)$theta, alpha = alpha)
-    })
+    # generate augmented x and augmented y
+    n_train = nrow(train_z)
+    if (missing) {
+      Z_nonNA_id = which(apply(train_z, 1, function(x) sum(is.na(x)) == 0))
+      X_nonNA_id = lapply(test_x, function(sublist) {
+        which(apply(sublist, 1, function(x) sum(is.na(x)) == 0))
+      })
+
+      # compute the union ID (Y and X)
+      inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
+      inter_ID_XX = lapply(combn(1:D, 2, simplify = F), function(x) sort(intersect(X_nonNA_id[[x[1]]],
+                                                                                   X_nonNA_id[[x[2]]])))
+
+      # center X_d
+      coef = lapply(train_x, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n_train - 1)/n_train))
+      centeredX = lapply(1:length(train_x), function(i) scale(train_x[[i]], scale = coef[[i]], center = T))
+
+      # generate augmented data matrices X' and Y'
+      bigx = xprimeMissing(centeredX, inter_ID_YX, inter_ID_XX, alpha = alpha)
+      transy = matrix(NA, ncol = ncol(train_z) - 1, nrow = nrow(train_z))
+      transy[Z_nonNA_id, ] = transformYCpp(train_z[Z_nonNA_id, ])
+      bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
+      temp_y = lapply(inter_ID_YX, function(obs_idx) transy[obs_idx, , drop = F]/sqrt(n_train * D))
+      bigy[1:(sum(sapply(inter_ID_YX, length))), ] = sqrt(alpha) * do.call(rbind, temp_y)
+
+    } else {
+      if (any(anyNA(train_z), sapply(train_x, anyNA))) {
+        stop("Datasets contain missing value! Please set missing = T")
+      }
+      # center X_d
+      coef = lapply(train_x, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n_train - 1)/n_train))
+      centeredX = lapply(1:length(train_x), function(i) scale(train_x[[i]], scale = coef[[i]], center = T))
+
+      # generate augmented data matrices X' and Y'
+      bigx = xPrime(centeredX, alpha = alpha)
+      transy = transformYCpp(train_z)
+      bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
+      bigy[1:(n_train * D), ] = sqrt(alpha) * do.call(rbind, replicate(D, transy, simplify = FALSE))/sqrt(n_train * D)
+    }
+
+    # train JACA model
+    for (cv_ind in 1:nrow(init_grid)){
+      fit_model = jacaTrain_augmented(bigy = bigy, bigx = bigx, coef = coef, D = D, p_n = sapply(train_x, ncol),  lambda = init_grid[cv_ind, 1] * lambda_t,
+                                      rho = init_grid[cv_ind, 2], missing = missing, alpha = alpha, W_list = fit_model_old, eps = eps,
+                                      kmax = kmax, verbose = verbose)
+      cv[i, cv_ind] = objectiveJACA(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D,
+                                    theta = transformY(train_z)$theta, alpha = alpha)
+      fit_model_old = fit_model
+    }
     cat("Complete", i, "\n")
   }
 
@@ -308,7 +350,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
 
   # compute final W_list
   W_min = jacaTrain(Z = Z, X_list = X_list, lambda = as.numeric(grid_min[1]) * lambda_t, rho = as.numeric(grid_min[2]),
-                     missing = missing, alpha = alpha, verbose = F, W_list = W_list, kmax = kmax, eps = eps)
+                    missing = missing, alpha = alpha, verbose = F, W_list = W_list, kmax = kmax, eps = eps)
 
 
   # selected parameters
