@@ -214,8 +214,6 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     })
     # compute the union ID (Y and X)
     inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
-
-
     # Compute maximum lambda
     lambda_t = lambda_max(Z = Z, X_list = X_list, D = D, Z_nonNA_id = Z_nonNA_id, X_nonNA_id = X_nonNA_id) * alpha
   } else {
@@ -294,14 +292,13 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     n_train = nrow(train_z)
     if (missing) {
       Z_nonNA_id = which(apply(train_z, 1, function(x) sum(is.na(x)) == 0))
-      X_nonNA_id = lapply(test_x, function(sublist) {
+      X_nonNA_id = lapply(train_x, function(sublist) {
         which(apply(sublist, 1, function(x) sum(is.na(x)) == 0))
       })
 
       # compute the union ID (Y and X)
       inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
-      inter_ID_XX = lapply(combn(1:D, 2, simplify = F), function(x) sort(intersect(X_nonNA_id[[x[1]]],
-                                                                                   X_nonNA_id[[x[2]]])))
+      inter_ID_XX = lapply(combn(1:D, 2, simplify = F), function(x) sort(intersect(X_nonNA_id[[x[1]]], X_nonNA_id[[x[2]]])))
 
       # center X_d
       coef = lapply(train_x, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n_train - 1)/n_train))
@@ -334,9 +331,12 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     for (cv_ind in 1:nrow(init_grid)){
       fit_model = jacaTrain_augmented(bigy = bigy, bigx = bigx, coef = coef, D = D, p_n = sapply(train_x, ncol),  lambda = init_grid[cv_ind, 1] * lambda_t,
                                       rho = init_grid[cv_ind, 2], missing = missing, alpha = alpha, W_list = fit_model_old, eps = eps,
-                                      kmax = kmax, verbose = verbose)
+                                      kmax = kmax, verbose = F)
       cv[i, cv_ind] = objectiveJACA(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D,
                                     theta = transformY(train_z)$theta, alpha = alpha)
+      if (verbose){
+        print(paste0("Parameters: ", round(init_grid[cv_ind, 1] * lambda_t, 3), ", ", init_grid[cv_ind, 2], ". Objective (sum corr): ", -cv[i, cv_ind]))
+      }
       fit_model_old = fit_model
     }
     cat("Complete", i, "\n")
