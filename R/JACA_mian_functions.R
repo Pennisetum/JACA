@@ -184,7 +184,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     Ytilde = transformYCpp(Z)
     centeredX = list()
     n = nrow(Z)
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((nrow(na.omit(x)) - 1)/nrow(na.omit(x))))
+    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
 
     # calculate maximum of lambda
     lambda_t = rep(0, D)
