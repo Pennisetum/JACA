@@ -51,7 +51,7 @@ generateAugmentedXY <- function(Z, X_list, alpha = 0.5, missing = FALSE){
 
     # center and scale each view X_d
     # scale function can work with NA measurements
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
+    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((nrow(na.omit(x)) - 1)/nrow(na.omit(x))))
     centeredX = lapply(1:D, function(i) scale(X_list[[i]], scale = coef[[i]], center = T))
 
     # generate augmented data matrices X' and Y'
