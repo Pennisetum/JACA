@@ -78,59 +78,19 @@ jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = 
     W_list[[1]] = do.call(rbind, W_list)
   }
 
-  if (missing) {
-    Z_nonNA_id = which(apply(Z, 1, function(x) sum(is.na(x)) == 0))
-    X_nonNA_id = lapply(X_list, function(sublist) {
-      which(apply(sublist, 1, function(x) sum(is.na(x)) == 0))
-    })
-
-    # compute the union ID (Y and X)
-    inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
-    inter_ID_XX = lapply(combn(1:D, 2, simplify = F), function(x) sort(intersect(X_nonNA_id[[x[1]]],
-                                                                                 X_nonNA_id[[x[2]]])))
-
-    # center X_d
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
-    centeredX = lapply(1:length(X_list), function(i) scale(X_list[[i]], scale = coef[[i]], center = T))
-
-    # generate augmented data matrices X' and Y'
-    bigx = xprimeMissing(centeredX, inter_ID_YX, inter_ID_XX, alpha = alpha)
-    transy = matrix(NA, ncol = ncol(Z) - 1, nrow = nrow(Z))
-    transy[Z_nonNA_id, ] = transformYCpp(Z[Z_nonNA_id, ])
-    bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
-    temp_y = lapply(inter_ID_YX, function(obs_idx) transy[obs_idx, , drop = F]/sqrt(n * D))
-    bigy[1:(sum(sapply(inter_ID_YX, length))), ] = sqrt(alpha) * do.call(rbind, temp_y)
-
-  } else {
-    if (any(anyNA(Z), sapply(X_list, anyNA))) {
-      stop("Datasets contain missing value! Please set missing = T")
-    }
-    # center X_d
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
-    centeredX = lapply(1:length(X_list), function(i) scale(X_list[[i]], scale = coef[[i]], center = T))
-
-    # generate augmented data matrices X' and Y'
-    bigx = xPrime(centeredX, alpha = alpha)
-    transy = transformYCpp(Z)
-    bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
-    bigy[1:(n * D), ] = sqrt(alpha) * do.call(rbind, replicate(D, transy, simplify = FALSE))/sqrt(n *
-                                                                                                    D)
-  }
+  # Generate augmented X and Y
+  out = generateAugmentedXY(Z, X_list, alpha = alpha, missing = missing)
 
   # compute number of features in each data set
-  p_n = sapply(centeredX, ncol)
+  p_n = sapply(X_list, ncol)
   # formulate lambda vector
   lambda_vec = rep(lambda, p_n)
 
-  if (nrow(bigx) != nrow(bigy))
-    stop("Dimensions of X_list and Z don't match!")
-
   # fit model
-  result = jacaCpp(Y = bigy, X_list = bigx, lambda = lambda_vec, rho = rho, W_list = W_list, kmax = kmax,
+  result = jacaCpp(Y = out$bigy, X_list = out$bigx, lambda = lambda_vec, rho = rho, W_list = W_list, kmax = kmax,
                    eps = eps, verbose = verbose)
   order_idx = c(0, cumsum(p_n))
-  W_d = lapply(1:D, function(idx) diag(1/coef[[idx]], length(coef[[idx]])) %*% result[(order_idx[idx] +
-                                                                                         1):(order_idx[idx + 1]), , drop = F])
+  W_d = lapply(1:D, function(idx) diag(1/out$coef[[idx]], length(out$coef[[idx]])) %*% result[(order_idx[idx] + 1):(order_idx[idx + 1]), , drop = F])
 
   for (i in 1:D) {
     W_d[[i]][abs(W_d[[i]]) < eps] = 0
@@ -156,7 +116,7 @@ jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = 
 #' @param alpha The parameter to control the weight between optimal scoring and CCA part. Default is 0.5.
 #' @param W_list A list of inital guess of matrices of discriminant vectors (can be served as a warm start).
 #' @param kmax Max iteration number.
-#' @param eps  Threashold value used to determine the convergence of the optimization algorithm; the default value is 1e-06.
+#' @param eps  Threshold value used to determine the convergence of the optimization algorithm; the default value is 1e-06.
 #' @param verbose Logical. If False, the algorithm will stay silent. If True, it will print out fitting progress.
 #' @param foldID User-supplied fold seperation. The default is NULL, and \code{jacaCV} generates its own folds.
 
@@ -241,9 +201,9 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     if (length(lambda_seq) == 0) {
       warning("Check input lambda_seq")
       # generate lambda_seq
-      lambda_seq <- exp(seq(log(1), log(1e-02), length.out = n_lambda))
+      lambda_seq <- exp(seq(log(1), log(1e-01), length.out = n_lambda))
     }
-  } else lambda_seq <- exp(seq(log(1), log(1e-02), length.out = n_lambda))
+  } else lambda_seq <- exp(seq(log(1), log(1e-01), length.out = n_lambda))
   n_lambda = length(lambda_seq)
 
   # If rho is supplied, the function should only keep values that satisfy 0<=rho<=1
@@ -254,6 +214,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     stop("Check rho_seq")
   }
   n_rho = length(rho_seq)
+  p_n = sapply(X_list, ncol)
 
   if (missing) {
     ## generate the fold index
@@ -287,53 +248,16 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     test_z = Z[test_idx, ]
     train_x = lapply(X_list, function(X) X[-test_idx, ])
     train_z = Z[-test_idx, ]
+    theta = transformY(train_z)$theta
 
     # generate augmented x and augmented y
-    n_train = nrow(train_z)
-    if (missing) {
-      Z_nonNA_id = which(apply(train_z, 1, function(x) sum(is.na(x)) == 0))
-      X_nonNA_id = lapply(train_x, function(sublist) {
-        which(apply(sublist, 1, function(x) sum(is.na(x)) == 0))
-      })
-
-      # compute the union ID (Y and X)
-      inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
-      inter_ID_XX = lapply(combn(1:D, 2, simplify = F), function(x) sort(intersect(X_nonNA_id[[x[1]]], X_nonNA_id[[x[2]]])))
-
-      # center X_d
-      coef = lapply(train_x, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n_train - 1)/n_train))
-      centeredX = lapply(1:length(train_x), function(i) scale(train_x[[i]], scale = coef[[i]], center = T))
-
-      # generate augmented data matrices X' and Y'
-      bigx = xprimeMissing(centeredX, inter_ID_YX, inter_ID_XX, alpha = alpha)
-      transy = matrix(NA, ncol = ncol(train_z) - 1, nrow = nrow(train_z))
-      transy[Z_nonNA_id, ] = transformYCpp(train_z[Z_nonNA_id, ])
-      bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
-      temp_y = lapply(inter_ID_YX, function(obs_idx) transy[obs_idx, , drop = F]/sqrt(n_train * D))
-      bigy[1:(sum(sapply(inter_ID_YX, length))), ] = sqrt(alpha) * do.call(rbind, temp_y)
-
-    } else {
-      if (any(anyNA(train_z), sapply(train_x, anyNA))) {
-        stop("Datasets contain missing value! Please set missing = T")
-      }
-      # center X_d
-      coef = lapply(train_x, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n_train - 1)/n_train))
-      centeredX = lapply(1:length(train_x), function(i) scale(train_x[[i]], scale = coef[[i]], center = T))
-
-      # generate augmented data matrices X' and Y'
-      bigx = xPrime(centeredX, alpha = alpha)
-      transy = transformYCpp(train_z)
-      bigy = matrix(0, ncol = ncol(transy), nrow = nrow(bigx))
-      bigy[1:(n_train * D), ] = sqrt(alpha) * do.call(rbind, replicate(D, transy, simplify = FALSE))/sqrt(n_train * D)
-    }
+    out = generateAugmentedXY(Z = train_z, X_list = train_x, alpha = alpha, missing = missing)
 
     # train JACA model
     for (cv_ind in 1:nrow(init_grid)){
-      fit_model = jacaTrain_augmented(bigy = bigy, bigx = bigx, coef = coef, D = D, p_n = sapply(train_x, ncol),  lambda = init_grid[cv_ind, 1] * lambda_t,
-                                      rho = init_grid[cv_ind, 2], missing = missing, alpha = alpha, W_list = fit_model_old, eps = eps,
-                                      kmax = kmax, verbose = F)
+      fit_model = jacaTrain_augmented(bigy = out$bigy, bigx = out$bigx, coef = out$coef, D = D, p_n = p_n,  lambda = init_grid[cv_ind, 1] * lambda_t, rho = init_grid[cv_ind, 2], missing = missing, alpha = alpha, W_list = fit_model_old, eps = eps, kmax = kmax, verbose = F)
       cv[i, cv_ind] = objectiveJACA(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D,
-                                    theta = transformY(train_z)$theta, alpha = alpha)
+                                    theta = theta, alpha = alpha)
       if (verbose){
         print(paste0("Parameters: ", round(init_grid[cv_ind, 1] * lambda_t, 3), ", ", init_grid[cv_ind, 2], ". Objective (sum corr): ", -cv[i, cv_ind]))
       }
@@ -434,3 +358,151 @@ predictJACA = function(W_list, trainx, trainz, testx, posterior = F) {
 
   return(prediction = Y.pred)
 }
+
+
+
+# define the evaluation function for cross validation when alpha = 1
+objectiveJACAone = function(W_list, test_z, train_x, test_x, D, theta) {
+  ## W_list: the results we get from JACA. D: number of data sets.
+  Ytilde = test_z %*% theta
+  n = nrow(test_z)
+
+  # Xbar: the mean values of train_x
+  Xbar = lapply(train_x, function(mat) colMeans(mat, na.rm = T))
+  centeredX = lapply(1:D, function(num) test_x[[num]] - matrix(rep(Xbar[[num]], nrow(test_x[[num]])), byrow = T, nrow = nrow(test_x[[num]])))
+
+  # Use correlation as cv criterion the part1 of the objective function
+  part1 = sum(sapply(1:D, function(num) -sum(cv_cor(Ytilde, centeredX[[num]] %*% W_list[[num]]))))
+  # the part2 of the objective function
+
+  return(part1)
+}
+
+
+# By default, alpha is set fixed, and the tuning for JACA is based on objective JACA
+# Here we investigate alternative tuning based on misclassification error rate for all parameters
+jacaCVerror <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_seq = seq(0.01, 1, length = 5),
+                        n_rho = 5, missing = F, alpha_seq = c(0.1, 0.3, 0.5, 0.7, 0.9, 1), W_list = NULL, kmax = 500, eps = 1e-06, verbose = F, foldID = NULL) {
+  # record the number of views
+  D = length(X_list)
+
+  if (missing) {
+    # Record the missing ID
+    Z_nonNA_id = which(apply(Z, 1, function(x) sum(is.na(x)) == 0))
+    X_nonNA_id = lapply(X_list, function(sublist) {
+      which(apply(sublist, 1, function(x) sum(is.na(x)) == 0))
+    })
+    # compute the union ID (Y and X)
+    inter_ID_YX = lapply(X_nonNA_id, function(x) sort(intersect(Z_nonNA_id, x)))
+
+    # Compute maximum lambda
+    lambda_t = lambda_max(Z = Z, X_list = X_list, D = D, Z_nonNA_id = Z_nonNA_id, X_nonNA_id = X_nonNA_id)
+  } else {
+    if (any(anyNA(Z), sapply(X_list, anyNA))) {
+      stop("Datasets contain missing value! Please set missing = T")
+    }
+    # caculate transformed Ytilde and scale X
+    Ytilde = transformY(Z)$Ytilde
+    centeredX = list()
+    n = nrow(Z)
+    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
+
+    # calculate maximum of lambda
+    lambda_t = rep(0, D)
+    for (i in 1:D) {
+      centeredX[[i]] = scale(X_list[[i]], scale = coef[[i]], center = T)
+      lambda_t[i] = max(sqrt(rowSums(abs(crossprod(centeredX[[i]], Ytilde))^2))/(n * D))
+    }
+  }
+
+  # If lambda_seq is supplied, the function should only keep values that satisfy 0 < lambda_i <
+  # lambda_max. Otherwise, generate lambda_seq
+  if (is.null(lambda_seq)) {
+    lambda_seq <- exp(seq(log(1), log(1e-01), length.out = n_lambda))
+  }
+  n_lambda = length(lambda_seq)
+
+  # If rho is supplied, the function should only keep values that satisfy 0<=rho<=1
+  if (!is.null(rho_seq)) {
+    rho_seq = rho_seq[(rho_seq >= 0) & (rho_seq <= 1)]
+    rho_seq <- sort(rho_seq)
+  } else {
+    stop("Check rho_seq")
+  }
+  n_rho = length(rho_seq)
+
+  if (missing) {
+    ## generate the fold index
+    if (is.null(foldID)) {
+      id <- assignID(Z = Z, X_list = X_list, D = D, nfolds = nfolds)
+    } else {
+      id <- foldID
+    }
+  } else {
+    ## generate the fold index
+    if (is.null(foldID)) {
+      id <- 1:nrow(Z)
+      for (i in 1:ncol(Z)) {
+        id[Z[, i] == 1] <- sample(rep(seq_len(nfolds), length.out = sum(Z[, i] == 1)))
+      }
+    } else {
+      id <- foldID
+    }
+  }
+
+  #### calculate the normal JACA model.  generate the grid to search the parameters.
+  init_grid = expand.grid(lambda_seq, rho_seq, alpha_seq)
+  cv = matrix(0, nfolds, nrow(init_grid))
+
+  # cross validation part
+  for (i in 1:nfolds) {
+    ## during each iteration, select one as test, the rest (K-1) as train
+    test_idx = which(id == i)
+    test_z = Z[test_idx, ]
+    test_x = lapply(X_list, function(X) X[test_idx, ])
+
+
+    # Some of these will be NA so for misclassification error rate remove them. Also if check for error rate, can only do on complete cases test data
+    # isnotna_test = (rowSums(is.na(test_z)) == 0) & (rowSums(is.na(do.call("cbind", test_x))) == 0)
+    # test_z = test_z[isnotna_test, ]
+    # test_x = lapply(test_x, function(x) x[isnotna_test, ])
+
+    # While I can fit the model on full data, I can only do full classification on complete data
+    train_x = lapply(X_list, function(X) X[-test_idx, ])
+    train_z = Z[-test_idx, ]
+
+    # Get training theta, only need to construct once
+    theta = transformY(train_z)$theta
+
+    cv[i, ] = sapply(1:nrow(init_grid), function(cv_ind) {
+      fit_model = jacaTrain(Z = train_z, X_list = train_x, lambda = init_grid[cv_ind, 1] * lambda_t * init_grid[cv_ind, 3],
+                            rho = init_grid[cv_ind, 2], missing = missing, alpha = init_grid[cv_ind, 3], eps = eps, W_list = W_list,
+                            kmax = kmax, verbose = verbose)
+      objectiveJACAone(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D, theta = theta)
+    })
+    cat("Complete", i, "\n")
+  }
+
+  # compute mean cv errors and choose parameters
+  cvm = colSums(cv)/nfolds
+  cvse = apply(cv, 2, sd)/sqrt(nfolds)
+
+
+  # Average over all minimums
+  grid_select = init_grid[cvm == min(cvm), ]
+  grid_min = colMeans(grid_select)
+
+  # compute final W_list
+  W_min = jacaTrain(Z = Z, X_list = X_list, lambda = as.numeric(grid_min[1]) * lambda_t * as.numeric(grid_min[3]), rho = as.numeric(grid_min[2]),
+                    missing = missing, alpha = as.numeric(grid_min[3]), verbose = F, W_list = W_list, kmax = kmax, eps = eps)
+
+
+  # selected parameters
+  lambda_min = as.numeric(grid_min[1])
+  rho_min = as.numeric(grid_min[2])
+  alpha_min = as.numeric(grid_min[3])
+
+
+  return(list(W_min = W_min, lambda_min = lambda_min, rho_min = rho_min, grid_seq = init_grid, error_mean = cvm, error_se = cvse, alpha_min = alpha_min))
+}
+

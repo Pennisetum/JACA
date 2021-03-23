@@ -266,8 +266,7 @@ jacaTrain_augmented = function(bigy, bigx, coef, D, p_n, lambda, rho, missing = 
   result = jacaCpp(Y = bigy, X_list = bigx, lambda = lambda_vec, rho = rho, W_list = W_list, kmax = kmax,
                    eps = eps, verbose = verbose)
   order_idx = c(0, cumsum(p_n))
-  W_d = lapply(1:D, function(idx) diag(1/coef[[idx]], length(coef[[idx]])) %*% result[(order_idx[idx] +
-                                                                                         1):(order_idx[idx + 1]), , drop = F])
+  W_d = lapply(1:D, function(idx) diag(1/coef[[idx]], length(coef[[idx]])) %*% result[(order_idx[idx] + 1):(order_idx[idx + 1]), , drop = F])
 
   for (i in 1:D) {
     W_d[[i]][abs(W_d[[i]]) < eps] = 0
