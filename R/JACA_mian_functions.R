@@ -90,7 +90,7 @@ jacaTrain = function(Z, X_list, lambda, rho, missing = F, alpha = 0.5, W_list = 
                                                                                  X_nonNA_id[[x[2]]])))
 
     # center X_d
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
+    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((nrow(na.omit(x)) - 1)/nrow(na.omit(x))))
     centeredX = lapply(1:length(X_list), function(i) scale(X_list[[i]], scale = coef[[i]], center = T))
 
     # generate augmented data matrices X' and Y'
@@ -224,7 +224,7 @@ jacaCV <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_
     Ytilde = transformYCpp(Z)
     centeredX = list()
     n = nrow(Z)
-    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((n - 1)/n))
+    coef = lapply(X_list, function(x) apply(x, 2, sd, na.rm = TRUE) * sqrt((nrow(na.omit(x)) - 1)/nrow(na.omit(x))))
 
     # calculate maximum of lambda
     lambda_t = rep(0, D)
