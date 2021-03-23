@@ -2,6 +2,7 @@
 
 export(generateAugmentedXY)
 export(jacaCV)
+export(jacaCVerror)
 export(jacaTrain)
 export(predictJACA)
 importFrom(Rcpp,evalCpp)

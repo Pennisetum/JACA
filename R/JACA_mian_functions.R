@@ -361,7 +361,7 @@ predictJACA = function(W_list, trainx, trainz, testx, posterior = F) {
 
 
 
-# define the evaluation function for cross validation when alpha = 1
+# The evaluation function for cross validation when alpha = 1 (error rate only)
 objectiveJACAone = function(W_list, test_z, train_x, test_x, D, theta) {
   ## W_list: the results we get from JACA. D: number of data sets.
   Ytilde = test_z %*% theta
@@ -379,12 +379,43 @@ objectiveJACAone = function(W_list, test_z, train_x, test_x, D, theta) {
 }
 
 
-# By default, alpha is set fixed, and the tuning for JACA is based on objective JACA
-# Here we investigate alternative tuning based on misclassification error rate for all parameters
+#' Alternative cross-validation function for JACA tailored towards minimization of error rates (allows to also cross-validate for alpha)
+#'
+#' Chooses optimal tuning parameters lambda, rho and alpha for function \code{jacaTrain} based on cross-validation to minimize out-of-sample misclassifiation error rate (measured by objective function in JACA with alpha = 1).
+#'
+#' @inheritParams jacaCV
+#' @param alpha_seq A sequence of alpha values to consider, where alpha must be strictly greater than 0, and less or equal to 1.
+#'
+#' @return \item{W_min}{A list of view-specific matrices of discriminant vectors. Generated using the parameters chosen by cross-validation method.}
+#' @return \item{lambda_min}{The value of L1 penalty parameter that resulted in the minimal mean cross-validation error.}
+#' @return \item{rho_min}{The value of L2 penalty parameter that resulted in the minimal mean cross-validation error.}
+#' @return \item{alpha_min}{The value of alpha parameter that resulted in the minimal mean cross-validation error.}
+#' @return \item{grid_seq}{The matrix of tuning parameters used.}
+#' @return \item{error_mean}{The mean cross-validated error of each combination of the tuning parameters.}
+#' @return \item{error_se}{The standard error of cross-validated error of each combination of the tuning parameters.}
+#' @export
+#'
+#' @examples
+#' #' set.seed(1)
+#' # Generate class indicator matrix Z
+#' n = 20
+#' Z=matrix(c(rep(1, n),rep(0, 2 * n)), byrow = FALSE, nrow = n)
+#' for(i in 1:n){
+#'   Z[i, ] = sample(Z[i, ])
+#' }
+#'
+#' # Generate input data X_list
+#' d = 2; p=10
+#' X_list = sapply(1:d, function(i) list(matrix(rnorm(n * p), n, p)))
+#'
+#' # Train JACA model using cross validation to minimize the error rate
+#' result = jacaCVerror(Z, X_list, nfolds = 3, lambda_seq = c(0.02, 0.04), rho_seq = c(0.3, 0.6))
+#'
 jacaCVerror <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50, rho_seq = seq(0.01, 1, length = 5),
-                        n_rho = 5, missing = F, alpha_seq = c(0.1, 0.3, 0.5, 0.7, 0.9, 1), W_list = NULL, kmax = 500, eps = 1e-06, verbose = F, foldID = NULL) {
+                        n_rho = 5, missing = F, alpha_seq = c(0.5, 0.7), W_list = NULL, kmax = 500, eps = 1e-06, verbose = F, foldID = NULL) {
   # record the number of views
   D = length(X_list)
+  p_n = sapply(X_list, ncol)
 
   if (missing) {
     # Record the missing ID
@@ -431,6 +462,12 @@ jacaCVerror <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50,
   }
   n_rho = length(rho_seq)
 
+  # Make sure that supplied alphas are not too close to 0, and are not above 1
+  if (any(alpha_seq <= 0.005) & any(alpha_seq > 1)){
+    stop("Check alpha_seq")
+  }
+  n_alpha = length(alpha_seq)
+
   if (missing) {
     ## generate the fold index
     if (is.null(foldID)) {
@@ -451,8 +488,13 @@ jacaCVerror <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50,
   }
 
   #### calculate the normal JACA model.  generate the grid to search the parameters.
-  init_grid = expand.grid(lambda_seq, rho_seq, alpha_seq)
+  init_grid = expand.grid(lambda_seq, rho_seq, alpha_seq) #first go through all lambdas, then through rhos, then through alphas
+
+  # Figure out in advance the indexes that correspond to a change in alpha_seq
+  index_alpha = (0:(n_alpha - 1)) * (n_lambda * n_rho) + 1
+
   cv = matrix(0, nfolds, nrow(init_grid))
+  fit_model_old = W_list
 
   # cross validation part
   for (i in 1:nfolds) {
@@ -474,12 +516,23 @@ jacaCVerror <- function(Z, X_list, nfolds = 5, lambda_seq = NULL, n_lambda = 50,
     # Get training theta, only need to construct once
     theta = transformY(train_z)$theta
 
-    cv[i, ] = sapply(1:nrow(init_grid), function(cv_ind) {
-      fit_model = jacaTrain(Z = train_z, X_list = train_x, lambda = init_grid[cv_ind, 1] * lambda_t * init_grid[cv_ind, 3],
-                            rho = init_grid[cv_ind, 2], missing = missing, alpha = init_grid[cv_ind, 3], eps = eps, W_list = W_list,
-                            kmax = kmax, verbose = verbose)
-      objectiveJACAone(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D, theta = theta)
-    })
+    for (cv_ind in 1:nrow(init_grid)){
+      # Generate augmented data matrix with that particular alpha at each cv_ind where alpha value changes
+      if (cv_ind %in% index_alpha){
+        out = generateAugmentedXY(Z = train_z, X_list = train_x, alpha = init_grid[cv_ind, 3], missing = missing)
+      }
+
+      # Update the model
+      fit_model = jacaTrain_augmented(bigy = out$bigy, bigx = out$bigx, coef = out$coef, D = D, p_n = p_n,  lambda = init_grid[cv_ind, 1] * lambda_t * init_grid[cv_ind, 3], rho = init_grid[cv_ind, 2], missing = missing, alpha = init_grid[cv_ind, 3], W_list = fit_model_old, eps = eps, kmax = kmax, verbose = F)
+
+      # Get the error
+      cv[i, cv_ind] = objectiveJACAone(W_list = fit_model, test_z = test_z, train_x = train_x, test_x = test_x, D = D, theta = theta)
+
+      # Save model fit
+      fit_model_old = fit_model
+    }
+
+    # Finish this fold
     cat("Complete", i, "\n")
   }
 
