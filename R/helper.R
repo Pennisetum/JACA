@@ -139,12 +139,22 @@ cv_cor = function(u, v) {
   u = scale(u[idx, , drop = F], center = T, scale = F)
   v = scale(v[idx, , drop = F], center = T, scale = F)
 
-  Su = tcrossprod(u)
-  Sv = tcrossprod(v)
-  if (sum(sum(diag(Su)) != 0) == 0 | sum(sum(diag(Sv)) != 0) == 0)
-    return(cor = 0)
-  crossterm = sum(diag(Su %*% Sv))
-  denominator = sqrt(sum(diag(Su %*% Su)) * sum(diag(Sv %*% Sv)))
+  #Su = tcrossprod(u)
+  #Sv = tcrossprod(v)
+  #if (sum(sum(diag(Su)) != 0) == 0 | sum(sum(diag(Sv)) != 0) == 0)
+  #  return(cor = 0)
+
+  #if (sum(sum(diag(Su)) != 0) == 0 | sum(sum(diag(Sv)) != 0) == 0)
+    #  return(cor = 0)
+
+  #crossterm = sum(diag(Su %*% Sv))
+  #denominator = sqrt(sum(diag(Su %*% Su)) * sum(diag(Sv %*% Sv)))
+
+  crossterm = sum(diag(tcrossprod(crossprod(u, v))))
+  if (crossterm == 0) {return(cor = 0)}
+
+  denominator = sqrt(sum(crossprod(u)^2) * sum(crossprod(v)^2))
+
   return(cor = sqrt(crossterm/denominator))
 }
 
